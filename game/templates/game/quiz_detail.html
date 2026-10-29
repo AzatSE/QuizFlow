@@ -1,0 +1,17 @@
+{% extends "game/base.html" %}
+{% block content %}
+<section class="card">
+  <h1>{{ quiz.title }}</h1>
+  <form method="post" action="{% url 'quiz_start' quiz.pk %}">{% csrf_token %}
+    <button class="btn" {% if not questions %}disabled{% endif %}>▶ Запустить игру</button></form>
+  <ol class="list">
+  {% for q in questions %}
+    <li><b>{{ q.text }}</b> <span class="muted">({{ q.time_limit }} c)</span><br>
+      {% for slot, text in q.option_slots %}<span class="chip c{{ slot }}{% if slot == q.correct %} ok{% endif %}">{{ text }}</span>{% endfor %}
+      <form method="post" action="{% url 'question_delete' quiz.pk q.pk %}" class="inline">{% csrf_token %}<button class="link danger">удалить</button></form></li>
+  {% endfor %}
+  </ol>
+  <h2>Добавить вопрос</h2>
+  <form method="post">{% csrf_token %}{{ form.as_p }}<button class="btn">Добавить</button></form>
+</section>
+{% endblock %}

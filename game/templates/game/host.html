@@ -1,0 +1,32 @@
+{% extends "game/base.html" %}
+{% load static %}
+{% block title %}Игра {{ game.pin }}{% endblock %}
+{% block content %}
+<div id="app" data-state-url="{{ state_url }}" data-action-url="{{ action_url }}">
+  <section id="p-lobby" class="card center">
+    <h1>Присоединяйтесь!</h1>
+    <img class="qr" src="{{ qr }}" alt="QR-код для входа в игру" width="260" height="260">
+    <p>или откройте <b class="mono">{{ join_url }}</b></p>
+    <p>PIN: <span class="pin">{{ game.pin }}</span></p>
+    <h2>Игроков: <span id="pcount">0</span></h2>
+    <div id="players" class="chips"></div>
+  </section>
+  <section id="p-stage" class="card" hidden>
+    <div class="row"><span id="qnum"></span><span id="timer" class="timer"></span><span id="answered"></span></div>
+    <h1 id="qtext"></h1>
+    <div class="opts">
+      <div class="opt c1" data-slot="1"><span class="t"></span><b class="n" hidden></b></div>
+      <div class="opt c2" data-slot="2"><span class="t"></span><b class="n" hidden></b></div>
+      <div class="opt c3" data-slot="3"><span class="t"></span><b class="n" hidden></b></div>
+      <div class="opt c4" data-slot="4"><span class="t"></span><b class="n" hidden></b></div>
+    </div>
+    <ol id="board" class="board" hidden></ol>
+  </section>
+  <section id="p-finished" class="card center" hidden>
+    <h1>🏆 Итоги</h1><ol id="final" class="board"></ol>
+    <a class="btn" href="{% url 'dashboard' %}">К моим квизам</a>
+  </section>
+  <p class="center"><button id="action" class="btn" hidden></button></p>
+</div>
+{% endblock %}
+{% block scripts %}<script src="{% static 'game/host.js' %}"></script>{% endblock %}

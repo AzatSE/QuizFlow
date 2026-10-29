@@ -1,0 +1,14 @@
+{% extends "game/base.html" %}
+{% block content %}
+<section class="card">
+  <h1>Мои квизы</h1>
+  <ul class="list">
+  {% for q in quizzes %}
+    <li><a href="{% url 'quiz_detail' q.pk %}">{{ q.title }}</a>
+      <form method="post" action="{% url 'quiz_delete' q.pk %}" class="inline">{% csrf_token %}<button class="link danger">удалить</button></form></li>
+  {% empty %}<li class="muted">Пока пусто</li>{% endfor %}
+  </ul>
+  <h2>Новый квиз</h2>
+  <form method="post">{% csrf_token %}{{ form.as_p }}<button class="btn">Создать</button></form>
+</section>
+{% endblock %}

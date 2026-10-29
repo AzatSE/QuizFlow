@@ -1,0 +1,18 @@
+{% extends "game/base.html" %}
+{% load static %}
+{% block content %}
+<div id="app" data-state-url="{{ state_url }}" data-answer-url="{{ answer_url }}">
+  <p class="row"><b id="me"></b><span id="score"></span></p>
+  <section id="p-wait" class="card center"><h1 id="wait-msg">Вы в игре! Ждём начала…</h1></section>
+  <section id="p-answer" hidden>
+    <h2 id="qtext" class="center"></h2><p id="timer" class="timer center"></p>
+    <div class="abtns">
+      <button class="abtn c1" data-slot="1"></button><button class="abtn c2" data-slot="2"></button>
+      <button class="abtn c3" data-slot="3"></button><button class="abtn c4" data-slot="4"></button>
+    </div>
+  </section>
+  <section id="p-result" class="card center" hidden><h1 id="res-title"></h1><p id="res-points"></p><p id="res-rank"></p></section>
+  <section id="p-finished" class="card center" hidden><h1>Игра окончена</h1><p id="fin-rank" class="pin"></p></section>
+</div>
+{% endblock %}
+{% block scripts %}<script src="{% static 'game/play.js' %}"></script>{% endblock %}

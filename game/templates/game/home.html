@@ -1,0 +1,12 @@
+{% extends "game/base.html" %}
+{% block content %}
+<section class="card center">
+  <h1>Присоединиться к игре</h1>
+  <form method="post">{% csrf_token %}
+    <input name="pin" inputmode="numeric" pattern="\d{6}" maxlength="6" placeholder="PIN игры" class="big" autocomplete="off" required>
+    {% if error %}<p class="err">{{ error }}</p>{% endif %}{{ form.pin.errors }}
+    <button class="btn">Войти</button>
+  </form>
+  <p class="muted">или отсканируйте QR-код на экране ведущего</p>
+</section>
+{% endblock %}

@@ -1,0 +1,13 @@
+{% extends "game/base.html" %}
+{% block content %}
+<section class="card center">
+  <h1>Игра {{ pin }}</h1>
+  {% if error %}<p class="err">{{ error }}</p>
+  {% else %}
+  <form method="post">{% csrf_token %}
+    <input name="nickname" maxlength="20" placeholder="Ваш ник" class="big" autocomplete="off" required autofocus>
+    {{ form.nickname.errors }}
+    <button class="btn">Играть!</button>
+  </form>{% endif %}
+</section>
+{% endblock %}
