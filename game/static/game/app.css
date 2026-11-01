@@ -37,3 +37,11 @@ textarea:focus-visible,summary:focus-visible{outline:3px solid var(--cyan);outli
 .question-preview p{margin:11px 0}
 .import-actions{justify-content:flex-start;flex-wrap:wrap;margin-top:20px}
 @media(max-width:680px){.import-box>summary{align-items:flex-start;flex-direction:column}}
+
+/* Deep-space atmosphere with an irregular, non-repeating star field. */
+body{background:radial-gradient(ellipse at 14% 12%,#36265366 0,transparent 34%),radial-gradient(ellipse at 86% 18%,#18394c55 0,transparent 31%),radial-gradient(ellipse at 55% 88%,#2c1a453d 0,transparent 40%),linear-gradient(145deg,#070914,#0d1021 55%,#080a15)}
+body:before{opacity:.78;background:url("starfield.svg") center top/cover no-repeat}
+body:after{background:#7647b51e;filter:blur(110px)}
+.hero-logo{display:block;width:min(100%,560px);height:auto;margin:0 auto 20px;filter:drop-shadow(0 0 28px #a98cff35)}
+.hero h1 span{color:#d9caff;text-shadow:0 0 30px #a98cff63}
+@media(max-width:680px){.hero-logo{width:min(100%,440px);margin-bottom:14px}.hero h1{font-size:clamp(1.8rem,8vw,2.7rem)}}
