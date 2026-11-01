@@ -1,5 +1,5 @@
 {% extends "game/base.html" %}
 {% block content %}
-<section class="card center"><h1>Вход</h1>
+<section class="card center join-card"><p class="eyebrow">Рады снова видеть</p><h1>Вход ведущего</h1>
 <form method="post">{% csrf_token %}{{ form.as_p }}<button class="btn">Войти</button></form></section>
 {% endblock %}

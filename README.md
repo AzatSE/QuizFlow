@@ -1,6 +1,6 @@
-# MiniKahoot (Django)
+# QuizFlow (Django)
 
-Мини-аналог Kahoot: ведущий создаёт квиз и запускает игру, на экране показывается **QR-код и PIN**,
+QuizFlow — космическая площадка живых викторин: ведущий создаёт квиз и запускает игру, на экране показывается **QR-код и PIN**,
 игроки сканируют QR с телефона, вводят ник и отвечают. Очки зависят от скорости ответа (500–1000).
 Без WebSocket/Redis — клиенты опрашивают сервер раз в секунду, поэтому запускается одной командой.
 
@@ -30,7 +30,7 @@ python manage.py migrate
 python manage.py collectstatic --noinput
 gunicorn config.wsgi --bind 127.0.0.1:8000 --workers 2
 ```
-Ставьте за nginx/Caddy с HTTPS и `DJANGO_TRUST_PROXY=1`. Периодически запускайте
+Ставьте за nginx/Caddy с HTTPS и `DJANGO_TRUST_PROXY=1` только если proxy удаляет клиентский `X-Forwarded-Proto` и выставляет свой. Для IP rate-limit приложение всё равно использует socket peer (`REMOTE_ADDR`), а не `X-Forwarded-For`: клиенты за одним proxy могут делить общий лимит. Периодически запускайте
 `python manage.py cleanup_games` (cron) — удаляет игры старше суток.
 Для нескольких воркеров/серверов замените кэш на Redis (иначе rate-limit считается отдельно в каждом процессе)
 и SQLite на PostgreSQL.
