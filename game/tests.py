@@ -29,6 +29,8 @@ class FlowTests(TestCase):
         response = self.pc.get(reverse("home"))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'class="hero-logo"')
+        self.assertContains(response, "quizflow-logo.png")
+        self.assertContains(response, "Сияющий звёздный поток")
         self.assertContains(response, "Выбирай ответ.")
         self.assertContains(response, "Набирай баллы.")
         self.assertContains(response, "Побеждай!")
