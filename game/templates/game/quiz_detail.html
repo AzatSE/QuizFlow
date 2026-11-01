@@ -17,11 +17,11 @@
 
   <details class="import-box" {% if import_raw_text or import_preview or import_errors %}open{% endif %}>
     <summary><span>✦ Вставить вопросы из текста</span><span class="muted">Предпросмотр без сохранения</span></summary>
-    <p class="muted">Вставь текст с метками <code>[вопрос]</code>, <code>[ответ]</code> и <code>[правильный ответ]</code>. Сначала можно проверить и отредактировать распознанные поля — в квиз они попадут только после подтверждения.</p>
+    <p class="muted">Вставь текст с метками <code>[вопрос]</code>, <code>[ответ]</code> и <code>[правильный ответ]</code>. Укажи от 2 до 4 вариантов строками <code>[ответ]</code>, а правильный ответ продублируй в строке <code>[правильный ответ]</code>. Вступление до первого вопроса можно оставить. Перед созданием проверь и отредактируй распознанные поля; вопросы сохранятся только после подтверждения.</p>
     <form method="post" action="{% url 'quiz_import' quiz.pk %}">
       {% csrf_token %}<input type="hidden" name="action" value="preview">
       <label for="import-raw-text">Текст для разбора</label>
-      <textarea id="import-raw-text" name="raw_text" rows="10" maxlength="30000" required placeholder="[вопрос] Какая команда создает проект?&#10;[ответ] python manage.py startproject&#10;[ответ] django-admin startapp&#10;[правильный ответ] django-admin startproject">{{ import_raw_text }}</textarea>
+      <textarea id="import-raw-text" name="raw_text" rows="10" maxlength="30000" required placeholder="[вопрос] Какая команда создает проект?&#10;[ответ] django-admin startproject&#10;[ответ] python manage.py startproject&#10;[ответ] django-admin startapp&#10;[правильный ответ] django-admin startproject">{{ import_raw_text }}</textarea>
       <p class="helptext">Максимум 50 вопросов за вставку; пустые строки между блоками можно оставлять.</p>
       <button class="btn secondary" type="submit">Разобрать и проверить</button>
     </form>
