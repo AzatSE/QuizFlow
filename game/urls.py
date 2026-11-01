@@ -23,6 +23,7 @@ urlpatterns = [
     path("logout/", auth_views.LogoutView.as_view(), name="logout"),
     path("dashboard/", views.dashboard, name="dashboard"),
     path("quiz/<int:pk>/", views.quiz_detail, name="quiz_detail"),
+    path("quiz/<int:pk>/import/", views.quiz_import, name="quiz_import"),
     path("quiz/<int:pk>/delete/", views.quiz_delete, name="quiz_delete"),
     path("quiz/<int:pk>/start/", views.quiz_start, name="quiz_start"),
     path("quiz/<int:pk>/question/<int:qpk>/delete/", views.question_delete, name="question_delete"),

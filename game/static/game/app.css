@@ -20,3 +20,20 @@ input,select{width:100%;font:inherit;padding:13px 15px;border-radius:12px;border
 [hidden]{display:none!important}
 @media(max-width:680px){.top{padding:11px 15px;min-height:65px}.top nav{gap:12px}.top nav a,.top .link{font-size:.8rem}.brand{font-size:1rem}.brand-mark{width:34px;height:34px}main,#app,.wide{width:min(100% - 22px,980px);margin:26px auto 54px}.card{border-radius:20px;padding:23px 18px}.opts{grid-template-columns:1fr}.abtn{min-height:20vh}.quiz-row{align-items:flex-start}.row{flex-wrap:wrap}.form-grid{grid-template-columns:1fr}.form-grid>*{grid-column:1!important}}
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{scroll-behavior:auto!important;transition:none!important}}
+
+input[type=checkbox]{width:auto;accent-color:var(--cyan)}
+textarea{width:100%;max-width:100%;resize:vertical;font:inherit;line-height:1.5;padding:13px 15px;border:1px solid #aab2da42;border-radius:12px;background:#0c1022;color:var(--fg)}
+textarea::placeholder{color:#78809e}
+textarea:focus-visible,summary:focus-visible{outline:3px solid var(--cyan);outline-offset:3px}
+.import-box{margin-top:28px;border-top:1px solid var(--line);padding-top:22px}
+.import-box>summary{display:flex;justify-content:space-between;gap:14px;align-items:center;cursor:pointer;font:700 1.12rem 'Space Grotesk',sans-serif;color:#e8e4ff}
+.import-box>summary::marker{color:var(--cyan)}
+.import-box code{color:var(--cyan)}
+.import-box>form{margin-top:16px}
+.import-errors{color:#ffb6c3;padding-left:22px}
+.import-preview{margin-top:25px;padding-top:18px;border-top:1px solid var(--line)}
+.question-preview{min-width:0;border:1px solid var(--line);border-radius:15px;padding:8px 18px 14px;margin:16px 0;background:#090d1a55}
+.question-preview legend{padding:0 8px;color:var(--cyan);font-weight:800}
+.question-preview p{margin:11px 0}
+.import-actions{justify-content:flex-start;flex-wrap:wrap;margin-top:20px}
+@media(max-width:680px){.import-box>summary{align-items:flex-start;flex-direction:column}}
