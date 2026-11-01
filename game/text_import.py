@@ -31,7 +31,7 @@ def parse_question_text(raw_text):
 
         choices = current["answers"]
         if not 2 <= len(choices) <= 4:
-            errors.append(f"Вопрос {number}: нужно указать от 2 до 4 строк [ответ] / [правильный ответ].")
+            errors.append(f"Вопрос {number}: нужно указать от 2 до 4 строк [ответ].")
         if len(current["correct"]) != 1:
             errors.append(f"Вопрос {number}: укажите ровно одну строку [правильный ответ].")
 
@@ -43,13 +43,25 @@ def parse_question_text(raw_text):
         normalized = [text.casefold() for text in answer_texts]
         if len(set(normalized)) != len(normalized):
             errors.append(f"Вопрос {number}: варианты ответов должны отличаться.")
+        valid_choices = (
+            2 <= len(choices) <= 4
+            and all(answer_texts)
+            and all(len(text) <= FIELD_LIMITS["answer"] for text in answer_texts)
+            and len(set(normalized)) == len(normalized)
+        )
+        valid_question = bool(question) and len(question) <= FIELD_LIMITS["question"]
 
         if len(current["correct"]) == 1:
             correct_text = current["correct"][0]
+            valid_correct = bool(correct_text) and len(correct_text) <= FIELD_LIMITS["answer"]
+            if not correct_text:
+                errors.append(f"Вопрос {number}: текст правильного ответа должен быть заполнен.")
+            if len(correct_text) > FIELD_LIMITS["answer"]:
+                errors.append(f"Вопрос {number}: длина правильного ответа — максимум {FIELD_LIMITS['answer']} символов.")
             matches = [index for index, text in enumerate(answer_texts) if text.casefold() == correct_text.casefold()]
             if len(matches) != 1:
                 errors.append(f"Вопрос {number}: правильный ответ должен совпадать с одним из вариантов ответа.")
-            elif 2 <= len(choices) <= 4 and question and len(question) <= FIELD_LIMITS["question"] and all(answer_texts) and all(len(text) <= FIELD_LIMITS["answer"] for text in answer_texts) and len(set(normalized)) == len(normalized):
+            elif valid_correct and valid_question and valid_choices:
                 blocks.append({
                     "text": question,
                     "option_1": answer_texts[0],
@@ -69,6 +81,9 @@ def parse_question_text(raw_text):
             continue
         match = LABEL_RE.fullmatch(line)
         if not match:
+            # AI answers may include a short preamble before the first formatted question.
+            if current is None and question_count == 0:
+                continue
             errors.append(f"Строка {line_number}: ожидается [вопрос], [ответ] или [правильный ответ].")
             continue
 
@@ -88,9 +103,10 @@ def parse_question_text(raw_text):
             errors.append(f"Строка {line_number}: сначала добавьте строку [вопрос].")
             continue
         value = value.strip()
-        current["answers"].append((label, value))
         if label == "правильный ответ":
             current["correct"].append(value)
+        else:
+            current["answers"].append((label, value))
 
     finish_block()
     if not blocks and not errors:

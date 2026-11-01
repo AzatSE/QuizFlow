@@ -136,14 +136,65 @@ class FlowTests(TestCase):
 
 
 class QuestionTextImportTests(TestCase):
-    source = """[вопрос] Какая команда создает проект?
-[ответ] python manage.py startproject
-[ответ] python manage.py startapp
-[правильный ответ] django-admin startproject
+    source = """[вопрос] Для чего нужен аккумулятор автомобиля?
+[ответ] Для охлаждения двигателя
+[ответ] Для запуска двигателя и питания электрических систем
+[ответ] Для очистки выхлопных газов
+[правильный ответ] Для запуска двигателя и питания электрических систем
 
-[вопрос] Для чего нужен URLconf?
-[ответ] Для настройки моделей
-[правильный ответ] Для маршрутизации запросов
+[вопрос] Какова основная функция моторного масла?
+[ответ] Накачивать шины
+[ответ] Очищать стёкла
+[ответ] Смазывать детали двигателя
+[правильный ответ] Смазывать детали двигателя
+
+[вопрос] Что нужно сделать водителю на красный сигнал светофора?
+[ответ] Остановиться перед стоп-линией
+[ответ] Увеличить скорость
+[ответ] Включить дальний свет
+[правильный ответ] Остановиться перед стоп-линией
+
+[вопрос] В каких единицах часто указывают давление в автомобильных шинах?
+[ответ] В литрах
+[ответ] В барах
+[ответ] В километрах
+[правильный ответ] В барах
+
+[вопрос] Для чего предназначен радиатор в системе охлаждения автомобиля?
+[ответ] Для отвода тепла от охлаждающей жидкости
+[ответ] Для подачи топлива в двигатель
+[ответ] Для зарядки аккумулятора
+[правильный ответ] Для отвода тепла от охлаждающей жидкости
+
+[вопрос] Что делает система ABS при резком торможении?
+[ответ] Автоматически переключает передачи
+[ответ] Увеличивает давление в шинах
+[ответ] Помогает предотвратить блокировку колёс
+[правильный ответ] Помогает предотвратить блокировку колёс
+
+[вопрос] Какую педаль нажимают, чтобы переключить передачу в автомобиле с механической коробкой?
+[ответ] Педаль тормоза
+[ответ] Педаль сцепления
+[ответ] Педаль акселератора
+[правильный ответ] Педаль сцепления
+
+[вопрос] Какое топливо используют дизельные двигатели?
+[ответ] Дизельное топливо
+[ответ] Бензин
+[ответ] Сжиженный природный газ
+[правильный ответ] Дизельное топливо
+
+[вопрос] Для чего нужны стеклоочистители?
+[ответ] Для охлаждения салона
+[ответ] Для освещения дороги
+[ответ] Для очистки лобового стекла от воды и грязи
+[правильный ответ] Для очистки лобового стекла от воды и грязи
+
+[вопрос] Какова функция свечей зажигания в бензиновом двигателе?
+[ответ] Они смазывают поршни
+[ответ] Они воспламеняют топливно-воздушную смесь
+[ответ] Они фильтруют моторное масло
+[правильный ответ] Они воспламеняют топливно-воздушную смесь
 """
 
     def setUp(self):
@@ -156,11 +207,25 @@ class QuestionTextImportTests(TestCase):
     def test_parser_maps_correct_answer_to_its_option_slot(self):
         questions, errors = parse_question_text(self.source)
         self.assertEqual(errors, [])
-        self.assertEqual(len(questions), 2)
-        self.assertEqual(questions[0]["correct"], 3)
-        self.assertEqual(questions[0]["option_3"], "django-admin startproject")
-        self.assertEqual(questions[1]["correct"], 2)
-        self.assertEqual(questions[1]["option_3"], "")
+        self.assertEqual(len(questions), 10)
+        self.assertEqual([question["correct"] for question in questions], [2, 3, 1, 2, 1, 3, 2, 1, 3, 2])
+        self.assertEqual(questions[0]["option_2"], "Для запуска двигателя и питания электрических систем")
+        self.assertEqual(questions[9]["option_2"], "Они воспламеняют топливно-воздушную смесь")
+
+    def test_parser_ignores_ai_preamble_before_first_question(self):
+        pasted_text = "Похоже, подписи и текст нужно разместить на одной строке. Вот версия с правильным ответом на разных позициях:\n\n" + self.source
+        questions, errors = parse_question_text(pasted_text)
+        self.assertEqual(errors, [])
+        self.assertEqual(len(questions), 10)
+
+    def test_parser_rejects_correct_answer_not_in_options(self):
+        invalid = """[вопрос] Сколько?
+[ответ] Один
+[ответ] Два
+[правильный ответ] Три"""
+        questions, errors = parse_question_text(invalid)
+        self.assertEqual(questions, [])
+        self.assertTrue(any("должен совпадать" in error for error in errors))
 
     def test_parser_rejects_ambiguous_or_invalid_blocks_and_oversized_text(self):
         invalid = """[вопрос] Сколько?
@@ -179,8 +244,9 @@ class QuestionTextImportTests(TestCase):
         response = self.client.post(self.url, {"action": "preview", "raw_text": self.source})
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.context["import_preview"])
+        self.assertContains(response, "правильный ответ продублируй")
         self.assertContains(response, "Подтвердить и создать вопросы")
-        self.assertContains(response, "django-admin startproject")
+        self.assertContains(response, "Для запуска двигателя и питания электрических систем")
         self.assertEqual(self.quiz.questions.count(), 0)
 
     @override_settings(MAX_QUESTIONS_PER_QUIZ=1)
