@@ -25,6 +25,14 @@ class FlowTests(TestCase):
         self.hc = Client(); self.hc.login(username="host", password="pw-pw-pw-123456")
         self.pc = Client()
 
+    def test_homepage_shows_redesigned_branding(self):
+        response = self.pc.get(reverse("home"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'class="hero-logo"')
+        self.assertContains(response, "Выбирай ответ.")
+        self.assertContains(response, "Набирай баллы.")
+        self.assertContains(response, "Побеждай!")
+
     def act(self, frm):
         return self.hc.post(reverse("host_action", args=[self.game.pin]), json.dumps({"from": frm}), content_type="application/json")
 
