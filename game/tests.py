@@ -7,6 +7,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from .models import Game, Question, Quiz
+from .text_import import MAX_IMPORT_CHARS, parse_question_text
 
 
 def mk_game(owner):
@@ -122,3 +123,107 @@ class FlowTests(TestCase):
         codes = [Client().post(reverse("login"), {"username": "host", "password": "bad"}).status_code for _ in range(17)]
         self.assertEqual(codes[-1], 429)
         cache.clear()
+
+
+class QuestionTextImportTests(TestCase):
+    source = """[вопрос] Какая команда создает проект?
+[ответ] python manage.py startproject
+[ответ] python manage.py startapp
+[правильный ответ] django-admin startproject
+
+[вопрос] Для чего нужен URLconf?
+[ответ] Для настройки моделей
+[правильный ответ] Для маршрутизации запросов
+"""
+
+    def setUp(self):
+        self.user = User.objects.create_user("importer", password="pw-pw-pw-123456")
+        self.quiz = Quiz.objects.create(owner=self.user, title="Django")
+        self.client = Client()
+        self.client.login(username="importer", password="pw-pw-pw-123456")
+        self.url = reverse("quiz_import", args=[self.quiz.pk])
+
+    def test_parser_maps_correct_answer_to_its_option_slot(self):
+        questions, errors = parse_question_text(self.source)
+        self.assertEqual(errors, [])
+        self.assertEqual(len(questions), 2)
+        self.assertEqual(questions[0]["correct"], 3)
+        self.assertEqual(questions[0]["option_3"], "django-admin startproject")
+        self.assertEqual(questions[1]["correct"], 2)
+        self.assertEqual(questions[1]["option_3"], "")
+
+    def test_parser_rejects_ambiguous_or_invalid_blocks_and_oversized_text(self):
+        invalid = """[вопрос] Сколько?
+[ответ] Один
+[ответ] Один
+[правильный ответ] Один
+[правильный ответ] Два"""
+        questions, errors = parse_question_text(invalid)
+        self.assertEqual(questions, [])
+        self.assertTrue(errors)
+        questions, errors = parse_question_text("x" * (MAX_IMPORT_CHARS + 1))
+        self.assertEqual(questions, [])
+        self.assertIn("слишком большой", errors[0])
+
+    def test_preview_populates_editable_forms_without_creating_questions(self):
+        response = self.client.post(self.url, {"action": "preview", "raw_text": self.source})
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.context["import_preview"])
+        self.assertContains(response, "Подтвердить и создать вопросы")
+        self.assertContains(response, "django-admin startproject")
+        self.assertEqual(self.quiz.questions.count(), 0)
+
+    @override_settings(MAX_QUESTIONS_PER_QUIZ=1)
+    def test_preview_warns_when_questions_need_to_be_skipped_for_quiz_limit(self):
+        response = self.client.post(self.url, {"action": "preview", "raw_text": self.source})
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.context["import_preview"])
+        self.assertIn("свободно мест: 1", response.context["import_error"])
+        self.assertEqual(self.quiz.questions.count(), 0)
+
+    def test_confirm_creates_only_non_deleted_questions(self):
+        data = {
+            "action": "create", "import-TOTAL_FORMS": "2", "import-INITIAL_FORMS": "2",
+            "import-MIN_NUM_FORMS": "0", "import-MAX_NUM_FORMS": "50",
+            "import-0-text": "Какая команда создает проект?",
+            "import-0-option_1": "python manage.py startproject",
+            "import-0-option_2": "python manage.py startapp",
+            "import-0-option_3": "django-admin startproject",
+            "import-0-option_4": "", "import-0-correct": "3", "import-0-time_limit": "20",
+            "import-1-text": "Не включать",
+            "import-1-option_1": "Один", "import-1-option_2": "Два",
+            "import-1-option_3": "", "import-1-option_4": "",
+            "import-1-correct": "1", "import-1-time_limit": "20", "import-1-DELETE": "on",
+        }
+        response = self.client.post(self.url, data)
+        self.assertRedirects(response, reverse("quiz_detail", args=[self.quiz.pk]))
+        self.assertEqual(self.quiz.questions.count(), 1)
+        question = self.quiz.questions.get()
+        self.assertEqual(question.correct, 3)
+        self.assertEqual(question.option_3, "django-admin startproject")
+
+    def test_invalid_preview_and_unauthorized_import_do_not_write(self):
+        response = self.client.post(self.url, {"action": "preview", "raw_text": "без метки"})
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.context["import_errors"])
+        self.assertIsNone(response.context["import_formset"])
+        self.assertEqual(self.quiz.questions.count(), 0)
+
+        other = User.objects.create_user("other-importer", password="pw-pw-pw-123456")
+        other_client = Client()
+        other_client.login(username="other-importer", password="pw-pw-pw-123456")
+        self.assertEqual(other_client.post(self.url, {"action": "preview", "raw_text": self.source}).status_code, 404)
+        self.assertEqual(self.quiz.questions.count(), 0)
+
+    def test_import_preview_escapes_user_text_and_requires_csrf(self):
+        payload = """[вопрос] <img src=x onerror=alert(1)>?
+[ответ] Один
+[правильный ответ] Два"""
+        response = self.client.post(self.url, {"action": "preview", "raw_text": payload})
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "<img src=x onerror=alert(1)>")
+        self.assertEqual(self.quiz.questions.count(), 0)
+
+        csrf_client = Client(enforce_csrf_checks=True)
+        csrf_client.force_login(self.user)
+        self.assertEqual(csrf_client.post(self.url, {"action": "preview", "raw_text": self.source}).status_code, 403)

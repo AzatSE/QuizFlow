@@ -14,5 +14,37 @@
   </ol>
   <h2>Добавить вопрос</h2>
   <form method="post">{% csrf_token %}{{ form.as_p }}<button class="btn">Добавить</button></form>
+
+  <details class="import-box" {% if import_raw_text or import_preview or import_errors %}open{% endif %}>
+    <summary><span>✦ Вставить вопросы из текста</span><span class="muted">Предпросмотр без сохранения</span></summary>
+    <p class="muted">Вставь текст с метками <code>[вопрос]</code>, <code>[ответ]</code> и <code>[правильный ответ]</code>. Сначала можно проверить и отредактировать распознанные поля — в квиз они попадут только после подтверждения.</p>
+    <form method="post" action="{% url 'quiz_import' quiz.pk %}">
+      {% csrf_token %}<input type="hidden" name="action" value="preview">
+      <label for="import-raw-text">Текст для разбора</label>
+      <textarea id="import-raw-text" name="raw_text" rows="10" maxlength="30000" required placeholder="[вопрос] Какая команда создает проект?&#10;[ответ] python manage.py startproject&#10;[ответ] django-admin startapp&#10;[правильный ответ] django-admin startproject">{{ import_raw_text }}</textarea>
+      <p class="helptext">Максимум 50 вопросов за вставку; пустые строки между блоками можно оставлять.</p>
+      <button class="btn secondary" type="submit">Разобрать и проверить</button>
+    </form>
+    {% if import_errors %}<ul class="import-errors" role="alert">{% for error in import_errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}
+
+    {% if import_preview %}
+      <div class="import-preview">
+        <h3>Проверь вопросы перед созданием</h3>
+        <p class="muted">Это только предпросмотр. Измени поля, отметь ненужные вопросы для удаления из импорта или отмени операцию.</p>
+        {% if import_error %}<p class="err" role="alert">{{ import_error }}</p>{% endif %}
+        <form method="post" action="{% url 'quiz_import' quiz.pk %}">
+          {% csrf_token %}<input type="hidden" name="action" value="create">
+          {{ import_formset.management_form }}{{ import_formset.non_form_errors }}
+          {% for question_form in import_formset %}
+            <fieldset class="question-preview">
+              <legend>Вопрос {{ forloop.counter }}</legend>
+              {{ question_form.non_field_errors }}{{ question_form.as_p }}
+            </fieldset>
+          {% endfor %}
+          <div class="row import-actions"><button class="btn" type="submit">Подтвердить и создать вопросы</button><a class="btn secondary" href="{% url 'quiz_detail' quiz.pk %}">Отмена</a></div>
+        </form>
+      </div>
+    {% endif %}
+  </details>
 </section>
 {% endblock %}
