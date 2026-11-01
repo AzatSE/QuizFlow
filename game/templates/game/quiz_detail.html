@@ -1,9 +1,10 @@
 {% extends "game/base.html" %}
 {% block content %}
 <section class="card">
-  <h1>{{ quiz.title }}</h1>
+  <p class="eyebrow">Редактор викторины</p>
+  <div class="section-head"><h1>{{ quiz.title }}</h1><span class="badge">{{ questions|length }} вопросов</span></div>
   <form method="post" action="{% url 'quiz_start' quiz.pk %}">{% csrf_token %}
-    <button class="btn" {% if not questions %}disabled{% endif %}>▶ Запустить игру</button></form>
+    <button class="btn" {% if not questions %}disabled{% endif %}>✦ Запустить игру</button></form>
   <ol class="list">
   {% for q in questions %}
     <li><b>{{ q.text }}</b> <span class="muted">({{ q.time_limit }} c)</span><br>

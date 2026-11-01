@@ -77,6 +77,15 @@ class FlowTests(TestCase):
         c = Client(); c.post(reverse("join", args=[self.game.pin]), {"nickname": "Late"})
         self.assertEqual(self.game.players.count(), 1)
 
+    @override_settings(TRUST_PROXY=True)
+    def test_rate_limit_ip_ignores_untrusted_forwarded_header(self):
+        from django.test import RequestFactory
+        from .utils import client_ip
+
+        request = RequestFactory().get("/", HTTP_X_FORWARDED_FOR="203.0.113.9")
+        request.META["REMOTE_ADDR"] = "192.0.2.10"
+        self.assertEqual(client_ip(request), "192.0.2.10")
+
     def test_host_isolation(self):
         c = Client(); c.login(username="other", password="pw-pw-pw-123456")
         for name in ("host", "host_state"):

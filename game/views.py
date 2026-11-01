@@ -212,15 +212,20 @@ def join(request, pin):
         error = "Игра уже началась"
     elif request.method == "POST" and form.is_valid():
         nick = form.cleaned_data["nickname"]
-        if game.players.count() >= settings.MAX_PLAYERS_PER_GAME:
-            error = "Комната заполнена"
-        else:
-            try:
-                with transaction.atomic():
+        try:
+            with transaction.atomic():
+                # Serialize joining against the host's lobby→question transition.
+                locked_game = Game.objects.select_for_update().get(pk=game.pk)
+                if locked_game.state != LOBBY:
+                    error = "Игра уже началась"
+                elif locked_game.players.count() >= settings.MAX_PLAYERS_PER_GAME:
+                    error = "Комната заполнена"
+                else:
                     player = Player.objects.create(game=game, nickname=nick)
-            except IntegrityError:
-                form.add_error("nickname", "Этот ник уже занят")
-            else:
+        except IntegrityError:
+            form.add_error("nickname", "Этот ник уже занят")
+        else:
+            if not error:
                 players = request.session.get("players", {})
                 players[game.pin] = player.pk
                 request.session["players"] = players

@@ -2,7 +2,7 @@
 {% load static %}
 {% block content %}
 <div id="app" data-state-url="{{ state_url }}" data-answer-url="{{ answer_url }}">
-  <p class="row"><b id="me"></b><span id="score"></span></p>
+  <p class="row"><b id="me"></b><span id="score" class="badge"></span></p>
   <section id="p-wait" class="card center"><h1 id="wait-msg">Вы в игре! Ждём начала…</h1></section>
   <section id="p-answer" hidden>
     <h2 id="qtext" class="center"></h2><p id="timer" class="timer center"></p>

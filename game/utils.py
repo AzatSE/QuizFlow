@@ -4,7 +4,6 @@ from functools import wraps
 
 import qrcode
 import qrcode.image.svg
-from django.conf import settings
 from django.core.cache import cache
 from django.http import HttpResponse
 from django.utils import timezone
@@ -13,10 +12,9 @@ from .models import QUESTION, RESULTS
 
 
 def client_ip(request):
-    if settings.TRUST_PROXY:
-        xff = request.META.get("HTTP_X_FORWARDED_FOR", "")
-        if xff:
-            return xff.split(",")[-1].strip()  # последний адрес добавлен нашим прокси
+    # X-Forwarded-For is client-controlled unless every proxy in the chain is
+    # configured to sanitize it. Do not use it for security decisions such as
+    # rate limiting; TRUST_PROXY is only for Django's HTTPS detection.
     return request.META.get("REMOTE_ADDR", "")
 
 
