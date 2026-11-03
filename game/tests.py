@@ -7,6 +7,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from .models import Game, Question, Quiz
+from .text_import import MAX_IMPORT_CHARS, parse_question_text
 
 
 def mk_game(owner):
@@ -23,6 +24,16 @@ class FlowTests(TestCase):
         self.game = mk_game(self.host)
         self.hc = Client(); self.hc.login(username="host", password="pw-pw-pw-123456")
         self.pc = Client()
+
+    def test_homepage_shows_redesigned_branding(self):
+        response = self.pc.get(reverse("home"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'class="hero-logo"')
+        self.assertContains(response, "quizflow-logo.png")
+        self.assertContains(response, "Сияющий звёздный поток")
+        self.assertContains(response, "Выбирай ответ.")
+        self.assertContains(response, "Набирай баллы.")
+        self.assertContains(response, "Побеждай!")
 
     def act(self, frm):
         return self.hc.post(reverse("host_action", args=[self.game.pin]), json.dumps({"from": frm}), content_type="application/json")
@@ -77,6 +88,15 @@ class FlowTests(TestCase):
         c = Client(); c.post(reverse("join", args=[self.game.pin]), {"nickname": "Late"})
         self.assertEqual(self.game.players.count(), 1)
 
+    @override_settings(TRUST_PROXY=True)
+    def test_rate_limit_ip_ignores_untrusted_forwarded_header(self):
+        from django.test import RequestFactory
+        from .utils import client_ip
+
+        request = RequestFactory().get("/", HTTP_X_FORWARDED_FOR="203.0.113.9")
+        request.META["REMOTE_ADDR"] = "192.0.2.10"
+        self.assertEqual(client_ip(request), "192.0.2.10")
+
     def test_host_isolation(self):
         c = Client(); c.login(username="other", password="pw-pw-pw-123456")
         for name in ("host", "host_state"):
@@ -113,3 +133,173 @@ class FlowTests(TestCase):
         codes = [Client().post(reverse("login"), {"username": "host", "password": "bad"}).status_code for _ in range(17)]
         self.assertEqual(codes[-1], 429)
         cache.clear()
+
+
+class QuestionTextImportTests(TestCase):
+    source = """[вопрос] Для чего нужен аккумулятор автомобиля?
+[ответ] Для охлаждения двигателя
+[ответ] Для запуска двигателя и питания электрических систем
+[ответ] Для очистки выхлопных газов
+[правильный ответ] Для запуска двигателя и питания электрических систем
+
+[вопрос] Какова основная функция моторного масла?
+[ответ] Накачивать шины
+[ответ] Очищать стёкла
+[ответ] Смазывать детали двигателя
+[правильный ответ] Смазывать детали двигателя
+
+[вопрос] Что нужно сделать водителю на красный сигнал светофора?
+[ответ] Остановиться перед стоп-линией
+[ответ] Увеличить скорость
+[ответ] Включить дальний свет
+[правильный ответ] Остановиться перед стоп-линией
+
+[вопрос] В каких единицах часто указывают давление в автомобильных шинах?
+[ответ] В литрах
+[ответ] В барах
+[ответ] В километрах
+[правильный ответ] В барах
+
+[вопрос] Для чего предназначен радиатор в системе охлаждения автомобиля?
+[ответ] Для отвода тепла от охлаждающей жидкости
+[ответ] Для подачи топлива в двигатель
+[ответ] Для зарядки аккумулятора
+[правильный ответ] Для отвода тепла от охлаждающей жидкости
+
+[вопрос] Что делает система ABS при резком торможении?
+[ответ] Автоматически переключает передачи
+[ответ] Увеличивает давление в шинах
+[ответ] Помогает предотвратить блокировку колёс
+[правильный ответ] Помогает предотвратить блокировку колёс
+
+[вопрос] Какую педаль нажимают, чтобы переключить передачу в автомобиле с механической коробкой?
+[ответ] Педаль тормоза
+[ответ] Педаль сцепления
+[ответ] Педаль акселератора
+[правильный ответ] Педаль сцепления
+
+[вопрос] Какое топливо используют дизельные двигатели?
+[ответ] Дизельное топливо
+[ответ] Бензин
+[ответ] Сжиженный природный газ
+[правильный ответ] Дизельное топливо
+
+[вопрос] Для чего нужны стеклоочистители?
+[ответ] Для охлаждения салона
+[ответ] Для освещения дороги
+[ответ] Для очистки лобового стекла от воды и грязи
+[правильный ответ] Для очистки лобового стекла от воды и грязи
+
+[вопрос] Какова функция свечей зажигания в бензиновом двигателе?
+[ответ] Они смазывают поршни
+[ответ] Они воспламеняют топливно-воздушную смесь
+[ответ] Они фильтруют моторное масло
+[правильный ответ] Они воспламеняют топливно-воздушную смесь
+"""
+
+    def setUp(self):
+        self.user = User.objects.create_user("importer", password="pw-pw-pw-123456")
+        self.quiz = Quiz.objects.create(owner=self.user, title="Django")
+        self.client = Client()
+        self.client.login(username="importer", password="pw-pw-pw-123456")
+        self.url = reverse("quiz_import", args=[self.quiz.pk])
+
+    def test_parser_maps_correct_answer_to_its_option_slot(self):
+        questions, errors = parse_question_text(self.source)
+        self.assertEqual(errors, [])
+        self.assertEqual(len(questions), 10)
+        self.assertEqual([question["correct"] for question in questions], [2, 3, 1, 2, 1, 3, 2, 1, 3, 2])
+        self.assertEqual(questions[0]["option_2"], "Для запуска двигателя и питания электрических систем")
+        self.assertEqual(questions[9]["option_2"], "Они воспламеняют топливно-воздушную смесь")
+
+    def test_parser_ignores_ai_preamble_before_first_question(self):
+        pasted_text = "Похоже, подписи и текст нужно разместить на одной строке. Вот версия с правильным ответом на разных позициях:\n\n" + self.source
+        questions, errors = parse_question_text(pasted_text)
+        self.assertEqual(errors, [])
+        self.assertEqual(len(questions), 10)
+
+    def test_parser_rejects_correct_answer_not_in_options(self):
+        invalid = """[вопрос] Сколько?
+[ответ] Один
+[ответ] Два
+[правильный ответ] Три"""
+        questions, errors = parse_question_text(invalid)
+        self.assertEqual(questions, [])
+        self.assertTrue(any("должен совпадать" in error for error in errors))
+
+    def test_parser_rejects_ambiguous_or_invalid_blocks_and_oversized_text(self):
+        invalid = """[вопрос] Сколько?
+[ответ] Один
+[ответ] Один
+[правильный ответ] Один
+[правильный ответ] Два"""
+        questions, errors = parse_question_text(invalid)
+        self.assertEqual(questions, [])
+        self.assertTrue(errors)
+        questions, errors = parse_question_text("x" * (MAX_IMPORT_CHARS + 1))
+        self.assertEqual(questions, [])
+        self.assertIn("слишком большой", errors[0])
+
+    def test_preview_populates_editable_forms_without_creating_questions(self):
+        response = self.client.post(self.url, {"action": "preview", "raw_text": self.source})
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.context["import_preview"])
+        self.assertContains(response, "правильный ответ продублируй")
+        self.assertContains(response, "Подтвердить и создать вопросы")
+        self.assertContains(response, "Для запуска двигателя и питания электрических систем")
+        self.assertEqual(self.quiz.questions.count(), 0)
+
+    @override_settings(MAX_QUESTIONS_PER_QUIZ=1)
+    def test_preview_warns_when_questions_need_to_be_skipped_for_quiz_limit(self):
+        response = self.client.post(self.url, {"action": "preview", "raw_text": self.source})
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.context["import_preview"])
+        self.assertIn("свободно мест: 1", response.context["import_error"])
+        self.assertEqual(self.quiz.questions.count(), 0)
+
+    def test_confirm_creates_only_non_deleted_questions(self):
+        data = {
+            "action": "create", "import-TOTAL_FORMS": "2", "import-INITIAL_FORMS": "2",
+            "import-MIN_NUM_FORMS": "0", "import-MAX_NUM_FORMS": "50",
+            "import-0-text": "Какая команда создает проект?",
+            "import-0-option_1": "python manage.py startproject",
+            "import-0-option_2": "python manage.py startapp",
+            "import-0-option_3": "django-admin startproject",
+            "import-0-option_4": "", "import-0-correct": "3", "import-0-time_limit": "20",
+            "import-1-text": "Не включать",
+            "import-1-option_1": "Один", "import-1-option_2": "Два",
+            "import-1-option_3": "", "import-1-option_4": "",
+            "import-1-correct": "1", "import-1-time_limit": "20", "import-1-DELETE": "on",
+        }
+        response = self.client.post(self.url, data)
+        self.assertRedirects(response, reverse("quiz_detail", args=[self.quiz.pk]))
+        self.assertEqual(self.quiz.questions.count(), 1)
+        question = self.quiz.questions.get()
+        self.assertEqual(question.correct, 3)
+        self.assertEqual(question.option_3, "django-admin startproject")
+
+    def test_invalid_preview_and_unauthorized_import_do_not_write(self):
+        response = self.client.post(self.url, {"action": "preview", "raw_text": "без метки"})
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.context["import_errors"])
+        self.assertIsNone(response.context["import_formset"])
+        self.assertEqual(self.quiz.questions.count(), 0)
+
+        other = User.objects.create_user("other-importer", password="pw-pw-pw-123456")
+        other_client = Client()
+        other_client.login(username="other-importer", password="pw-pw-pw-123456")
+        self.assertEqual(other_client.post(self.url, {"action": "preview", "raw_text": self.source}).status_code, 404)
+        self.assertEqual(self.quiz.questions.count(), 0)
+
+    def test_import_preview_escapes_user_text_and_requires_csrf(self):
+        payload = """[вопрос] <img src=x onerror=alert(1)>?
+[ответ] Один
+[правильный ответ] Два"""
+        response = self.client.post(self.url, {"action": "preview", "raw_text": payload})
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "<img src=x onerror=alert(1)>")
+        self.assertEqual(self.quiz.questions.count(), 0)
+
+        csrf_client = Client(enforce_csrf_checks=True)
+        csrf_client.force_login(self.user)
+        self.assertEqual(csrf_client.post(self.url, {"action": "preview", "raw_text": self.source}).status_code, 403)

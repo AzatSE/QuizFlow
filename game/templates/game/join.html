@@ -1,13 +1,16 @@
 {% extends "game/base.html" %}
 {% block content %}
-<section class="card center">
-  <h1>Игра {{ pin }}</h1>
+<section class="card center join-card">
+  <p class="eyebrow">Подключение к комнате</p>
+  <h1>Влетаем в игру</h1>
+  <p class="muted">PIN <span class="mono">{{ pin }}</span></p>
   {% if error %}<p class="err">{{ error }}</p>
   {% else %}
   <form method="post">{% csrf_token %}
-    <input name="nickname" maxlength="20" placeholder="Ваш ник" class="big" autocomplete="off" required autofocus>
+    <label for="nickname">Как тебя называть?</label>
+    <input id="nickname" name="nickname" maxlength="20" placeholder="Твой ник" class="big" autocomplete="off" required autofocus>
     {{ form.nickname.errors }}
-    <button class="btn">Играть!</button>
+    <button class="btn">Войти в игру <span aria-hidden="true">→</span></button>
   </form>{% endif %}
 </section>
 {% endblock %}

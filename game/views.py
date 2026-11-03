@@ -7,6 +7,7 @@ from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.views import LoginView
 from django.db import IntegrityError, transaction
 from django.db.models import F
+from django.forms import formset_factory
 from django.http import Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -15,7 +16,8 @@ from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_GET, require_POST
 
 from .forms import NicknameForm, PinForm, QuestionForm, QuizForm
-from .models import FINISHED, LOBBY, QUESTION, RESULTS, Answer, Game, Player, Quiz
+from .models import FINISHED, LOBBY, QUESTION, RESULTS, Answer, Game, Player, Question, Quiz
+from .text_import import MAX_IMPORT_CHARS, MAX_IMPORT_QUESTIONS, parse_question_text
 from .utils import points_for, qr_data_uri, sync, throttle
 
 
@@ -83,6 +85,80 @@ def quiz_detail(request, pk):
             q.save()
             return redirect("quiz_detail", pk=quiz.pk)
     return render(request, "game/quiz_detail.html", {"quiz": quiz, "questions": quiz.questions.all(), "form": form})
+
+
+def _question_import_formset(data=None, initial=None):
+    formset_class = formset_factory(
+        QuestionForm, extra=0, can_delete=True, max_num=MAX_IMPORT_QUESTIONS, validate_max=True,
+        absolute_max=MAX_IMPORT_QUESTIONS,
+    )
+    formset = formset_class(data=data, initial=initial, prefix="import")
+    for form in formset.forms:
+        form.fields["DELETE"].label = "Не включать этот вопрос"
+    return formset
+
+
+def _render_quiz_import(request, quiz, *, raw_text="", errors=None, formset=None, preview=False, import_error=None):
+    return render(request, "game/quiz_detail.html", {
+        "quiz": quiz,
+        "questions": quiz.questions.all(),
+        "form": QuestionForm(),
+        "import_raw_text": raw_text,
+        "import_errors": errors or [],
+        "import_formset": formset,
+        "import_preview": preview,
+        "import_error": import_error,
+    })
+
+
+@login_required
+@require_POST
+def quiz_import(request, pk):
+    quiz = _own_quiz(request, pk)
+    remaining = max(0, settings.MAX_QUESTIONS_PER_QUIZ - quiz.questions.count())
+    action = request.POST.get("action")
+
+    if action == "preview":
+        raw_text = request.POST.get("raw_text", "")
+        parsed, errors = parse_question_text(raw_text)
+        if len(raw_text) > MAX_IMPORT_CHARS:
+            raw_text = ""
+        formset = _question_import_formset(initial=parsed) if parsed and not errors else None
+        import_error = None
+        if formset and len(parsed) > remaining:
+            import_error = f"В квизе свободно мест: {remaining}. Отметь ненужные вопросы в предпросмотре."
+        return _render_quiz_import(request, quiz, raw_text=raw_text, errors=errors, formset=formset,
+                                   preview=bool(formset), import_error=import_error)
+
+    if action != "create":
+        return _render_quiz_import(request, quiz, errors=["Неизвестное действие импорта."])
+
+    formset = _question_import_formset(data=request.POST)
+    if not formset.is_valid():
+        return _render_quiz_import(request, quiz, formset=formset, preview=True)
+
+    rows = [form.cleaned_data for form in formset.forms if not form.cleaned_data.get("DELETE")]
+    if not rows:
+        return _render_quiz_import(request, quiz, formset=formset, preview=True,
+                                   import_error="Оставьте хотя бы один вопрос для создания.")
+    if len(rows) > remaining:
+        return _render_quiz_import(request, quiz, formset=formset, preview=True,
+                                   import_error=f"В квизе свободно мест: {remaining}. Отметь ненужные вопросы.")
+
+    import_error = None
+    with transaction.atomic():
+        locked_quiz = Quiz.objects.select_for_update().get(pk=quiz.pk, owner=request.user)
+        current_count = locked_quiz.questions.count()
+        if current_count + len(rows) > settings.MAX_QUESTIONS_PER_QUIZ:
+            import_error = "Свободных мест больше недостаточно: квиз изменился после предпросмотра."
+        else:
+            for offset, data in enumerate(rows, start=1):
+                data.pop("DELETE", None)
+                Question.objects.create(quiz=locked_quiz, order=current_count + offset, **data)
+
+    if import_error:
+        return _render_quiz_import(request, quiz, formset=formset, preview=True, import_error=import_error)
+    return redirect("quiz_detail", pk=quiz.pk)
 
 
 @login_required
@@ -212,15 +288,20 @@ def join(request, pin):
         error = "Игра уже началась"
     elif request.method == "POST" and form.is_valid():
         nick = form.cleaned_data["nickname"]
-        if game.players.count() >= settings.MAX_PLAYERS_PER_GAME:
-            error = "Комната заполнена"
-        else:
-            try:
-                with transaction.atomic():
+        try:
+            with transaction.atomic():
+                # Serialize joining against the host's lobby→question transition.
+                locked_game = Game.objects.select_for_update().get(pk=game.pk)
+                if locked_game.state != LOBBY:
+                    error = "Игра уже началась"
+                elif locked_game.players.count() >= settings.MAX_PLAYERS_PER_GAME:
+                    error = "Комната заполнена"
+                else:
                     player = Player.objects.create(game=game, nickname=nick)
-            except IntegrityError:
-                form.add_error("nickname", "Этот ник уже занят")
-            else:
+        except IntegrityError:
+            form.add_error("nickname", "Этот ник уже занят")
+        else:
+            if not error:
                 players = request.session.get("players", {})
                 players[game.pin] = player.pk
                 request.session["players"] = players

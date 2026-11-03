@@ -1,12 +1,19 @@
 {% extends "game/base.html" %}
+{% load static %}
 {% block content %}
-<section class="card center">
-  <h1>Присоединиться к игре</h1>
+<section class="card hero">
+  <img class="hero-logo" src="{% static 'game/quizflow-logo.png' %}" alt="Сияющий звёздный поток — логотип QuizFlow" width="1200" height="400" fetchpriority="high">
+  <p class="eyebrow">QuizFlow · живые викторины</p>
+  <h1>Выбирай ответ.<br>Набирай баллы.<br><span>Побеждай!</span></h1>
+  <p class="hero-copy">Запускай игру для друзей и команды. Сканируй код, выбирай ответ и поднимайся в таблице лидеров.</p>
+  <div class="join-card">
   <form method="post">{% csrf_token %}
-    <input name="pin" inputmode="numeric" pattern="\d{6}" maxlength="6" placeholder="PIN игры" class="big" autocomplete="off" required>
+    <label for="game-pin" class="eyebrow">Уже есть код комнаты?</label>
+    <input id="game-pin" name="pin" inputmode="numeric" pattern="\d{6}" maxlength="6" placeholder="ВВЕДИ PIN" class="big" autocomplete="off" required>
     {% if error %}<p class="err">{{ error }}</p>{% endif %}{{ form.pin.errors }}
-    <button class="btn">Войти</button>
+    <button class="btn">Присоединиться <span aria-hidden="true">→</span></button>
   </form>
-  <p class="muted">или отсканируйте QR-код на экране ведущего</p>
+  <p class="muted">или отсканируй QR-код на экране ведущего</p>
+  </div>
 </section>
 {% endblock %}
